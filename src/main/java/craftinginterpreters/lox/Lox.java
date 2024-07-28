@@ -26,6 +26,9 @@ public class Lox {
         }
     }
 
+    /*
+    Attempts to execute an arbitrary file.
+     */
     private static void runFile(String path) throws IOException {
         byte[] byteData = Files.readAllBytes(Paths.get(path));
         run(new String(byteData, Charset.defaultCharset()));
@@ -36,6 +39,9 @@ public class Lox {
         if (hadRuntimeError) System.exit(70);
     }
 
+    /*
+    TODO: Add proper repl mode support; should handle both expressions (evaluated immediately) and statements
+     */
     private static void runPrompt() throws IOException {
         InputStreamReader input = new InputStreamReader(System.in);
         BufferedReader reader = new BufferedReader(input);
@@ -47,6 +53,12 @@ public class Lox {
                 break;
             }
             run(line);
+            /*
+             TODO: Idea: wrap run in try catch, failure means invalid statement,
+              so write new helper function to evaluate as an expression,
+              will need to re-add that functionality to Parser.java. Failure from expression
+              eval means invalid altogether.
+             */
             hadError = false;
         }
     }

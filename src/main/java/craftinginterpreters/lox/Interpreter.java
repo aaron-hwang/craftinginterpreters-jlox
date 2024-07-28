@@ -2,7 +2,9 @@ package craftinginterpreters.lox;
 
 import java.util.List;
 
-public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
+public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
+
+    private Environment env = new Environment();
 
     public void interpret(List<Stmt> statements) {
         try {
@@ -16,6 +18,25 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
 
     private void execute(Stmt statement) {
         statement.accept(this);
+    }
+
+    public void executeBlock(List<Stmt> statements, Environment env) {
+        Environment previous = this.env;
+        try {
+            this.env = env;
+
+            for (Stmt statement : statements) {
+                execute(statement);
+            }
+        } finally {
+            this.env = previous;
+        }
+    }
+
+    @Override
+    public Void visitBlockStmt(Stmt.Block stmt) {
+        executeBlock(stmt.statements, new Environment(this.env));
+        return null;
     }
 
     public Object visitLiteralExpr(Expr.Literal expr) {
@@ -43,6 +64,17 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
+    public Void visitVarStmt(Stmt.Var stmt) {
+        Object value = null;
+        if (stmt.initializer != null) {
+            value = evaluate(stmt.initializer);
+        }
+
+        env.define(stmt.name.lexeme, value);
+        return null;
+    }
+
+    @Override
     public Object visitUnaryExpr(Expr.Unary expr) {
         Object right = evaluate(expr.right);
 
@@ -56,6 +88,18 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
 
         // Should be unreachable.
         return null;
+    }
+
+    @Override
+    public Object visitVariableExpr(Expr.Variable expr) {
+        return env.get(expr.name);
+    }
+
+    @Override
+    public Object visitAssignExpr(Expr.Assign expr) {
+        Object value = evaluate(expr.value);
+        env.assign(expr.name, value);
+        return value;
     }
 
     private void checkNumberOperand(Token operator, Object operand) {

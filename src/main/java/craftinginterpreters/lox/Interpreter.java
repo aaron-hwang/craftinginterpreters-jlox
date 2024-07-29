@@ -1,5 +1,6 @@
 package craftinginterpreters.lox;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
@@ -104,7 +105,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     @Override
     public Void visitWhileStmt(Stmt.While stmt) {
-        while (isTruthy(stmt.condition)) {
+        while (isTruthy(evaluate(stmt.condition))) {
             execute(stmt.body);
         }
 
@@ -200,6 +201,28 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
         // Should be unreachable, smth went wrong if we get here
         return null;
+    }
+
+    @Override
+    public Object visitCallExpr(Expr.Call expr) {
+        Object callee = evaluate(expr.callee);
+
+        List<Object> args = new ArrayList<>();
+        for (Object arg : expr.arguments) {
+            args.add(arg);
+        }
+
+        if (!(callee instanceof LoxCallable)) {
+            throw new RuntimeError(expr.paren, "Can only call functions and classes");
+        }
+
+        LoxCallable function = (LoxCallable)callee;
+        if (args.size() != function.arity()) {
+            throw new RuntimeError(expr.paren,
+                    "Expected " + function.arity() + " arguments but got " + args.size()
+                    );
+        }
+        return function.call(this, args);
     }
 
     // Lox's interpretation of equality

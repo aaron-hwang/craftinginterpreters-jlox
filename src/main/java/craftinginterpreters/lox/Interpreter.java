@@ -71,6 +71,19 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         return null;
     }
 
+    @Override
+    public Void visitClassStmt(Stmt.Class stmt) {
+        this.env.define(stmt.name.lexeme, null);
+        Map<String, LoxFunction> methods = new HashMap<>();
+        for (Stmt.Function method : stmt.methods) {
+            LoxFunction function = new LoxFunction(method, env, method.name.equals("init"));
+            methods.put(method.name.lexeme, function);
+        }
+        LoxClass klass = new LoxClass(stmt.name.lexeme, methods);
+        this.env.assign(stmt.name, klass);
+        return null;
+    }
+
     public Object visitLiteralExpr(Expr.Literal expr) {
         return expr.value;
     }
@@ -87,7 +100,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     @Override
     public Void visitFunctionStmt(Stmt.Function stmt) {
-        LoxFunction function = new LoxFunction(stmt, env);
+        LoxFunction function = new LoxFunction(stmt, env, false);
         env.define(stmt.name.lexeme, function);
         return null;
     }
@@ -117,6 +130,24 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         }
 
         return expr.right;
+    }
+
+    @Override
+    public Object visitSetExpr(Expr.Set expr) {
+        Object object = evaluate(expr.object);
+
+        if (!(object instanceof LoxInstance)) {
+            throw new RuntimeError(expr.name, "Only instances have fields");
+        }
+
+        Object value = evaluate(expr.value);
+        ((LoxInstance)object).set(expr.name, value);
+        return value;
+    }
+
+    @Override
+    public Object visitThisExpr(Expr.This expr) {
+        return lookUpVariable(expr.keyword, expr);
     }
 
     private Object evaluate(Expr expr) {
@@ -290,6 +321,16 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
                     );
         }
         return function.call(this, args);
+    }
+
+    @Override
+    public Object visitGetExpr(Expr.Get expr) {
+        Object object = evaluate(expr.object);
+        if (object instanceof LoxInstance) {
+            return ((LoxInstance)object).get(expr.name);
+        }
+
+        throw new RuntimeError(expr.name, "Ony instances have properties");
     }
 
     // Lox's interpretation of equality

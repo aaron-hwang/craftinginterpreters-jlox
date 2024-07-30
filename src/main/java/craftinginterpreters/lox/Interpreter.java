@@ -3,10 +3,33 @@ package craftinginterpreters.lox;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * A class that represents a Lox Interpreter
+ */
 public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
-    private Environment env = new Environment();
+    final Environment globals = new Environment();
+    private Environment env = globals;
 
+    public Interpreter() {
+        globals.define("clock", new LoxCallable() {
+            @Override
+            public int arity() {
+                return 0;
+            }
+
+            @Override
+            public Object call(Interpreter interpreter, List<Object> arguments) {
+                return (double)System.currentTimeMillis() / 1000.0;
+            }
+
+            @Override
+            public String toString() { return "<native>"; }
+        });
+    }
+
+
+    // The core functionality this class provides
     public void interpret(List<Stmt> statements) {
         try {
             for (Stmt statement : statements) {
@@ -55,8 +78,15 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     }
 
     @Override
+    public Void visitFunctionStmt(Stmt.Function stmt) {
+        LoxFunction function = new LoxFunction(stmt, env);
+        env.define(stmt.name.lexeme, function);
+        return null;
+    }
+
+    @Override
     public Void visitIfStmt(Stmt.If stmt) {
-        if (isTruthy(stmt.condition)) {
+        if (isTruthy(evaluate(stmt.condition))) {
             execute(stmt.thenBranch);
         } else if (stmt.elseBranch != null){
             execute(stmt.elseBranch);
@@ -90,6 +120,17 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         Object value = evaluate(stmt.expression);
         System.out.println(stringify(value));
         return null;
+    }
+
+    @Override
+    public Void visitReturnStmt(Stmt.Return stmt) {
+        Object value = null;
+
+        if (stmt.value != null) {
+            value = evaluate(stmt.value);
+        }
+
+        throw new Return(value);
     }
 
     @Override
@@ -153,7 +194,9 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     private boolean isTruthy(Object object) {
         if (object == null) return false;
-        if (object instanceof Boolean) return (boolean)object;
+        if (object instanceof Boolean) {
+            return (boolean)object;
+        }
         return true;
     }
 
@@ -208,8 +251,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         Object callee = evaluate(expr.callee);
 
         List<Object> args = new ArrayList<>();
-        for (Object arg : expr.arguments) {
-            args.add(arg);
+        for (Expr arg : expr.arguments) {
+            args.add(evaluate(arg));
         }
 
         if (!(callee instanceof LoxCallable)) {
